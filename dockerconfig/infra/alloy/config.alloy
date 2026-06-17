@@ -1,13 +1,13 @@
 // Grafana Alloy — shipper log Kartolo.
-// Memantau HANYA folder logloki/ (berisi hardlink yang dibuat backend),
-// bukan folder log asli. Mem-parse JSON jadi label cardinality-rendah,
+// Memantau folder logs/ di tiap app (frontend & backend) yang di-bind mount
+// ke /logs-root/<app>/logs. Mem-parse JSON jadi label cardinality-rendah,
 // lalu mengirim ke Loki.
 
 // Penemuan file: poll tiap 10 dtk — bind mount /mnt/d (drvfs) tidak reliable
 // untuk inotify, jadi discovery berbasis polling.
 local.file_match "kartolo" {
 	path_targets = [{
-		"__path__" = "/logs-root/logloki/*.log",
+		"__path__" = "/logs-root/*/logs/*.log",
 		"job"      = "kartolo",
 	}]
 	sync_period = "10s"

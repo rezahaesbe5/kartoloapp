@@ -37,7 +37,7 @@ services:
       - "12345"
     volumes:
       - ./infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
-      - ../logloki:/logs-root/logloki
+      - ../:/logs-root:ro
       - kartolo-alloy-data:/var/lib/alloy/data
     depends_on:
       loki:
@@ -48,15 +48,15 @@ services:
 
   gateway:
     build:
-      context: ../backend_gatewayauth
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: dockerconfig/Dockerfile.gateway
     container_name: kartolo-gateway
     ports:
       - "127.0.0.1:3000:3000"
     env_file:
       - ../backend_gatewayauth/.env
     volumes:
-      - ../logloki:/app/logloki
+      - ../backend_gatewayauth/logs:/app/logs
     depends_on:
       redis:
         condition: service_healthy
@@ -66,13 +66,13 @@ services:
 
   administration:
     build:
-      context: ../backend_administration
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: dockerconfig/Dockerfile.administration
     container_name: kartolo-administration
     env_file:
       - ../backend_administration/.env
     volumes:
-      - ../logloki:/app/logloki
+      - ../backend_administration/logs:/app/logs
     depends_on:
       redis:
         condition: service_healthy
@@ -84,13 +84,15 @@ services:
 
   frontend:
     build:
-      context: ../frontend_kartoloapps
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: dockerconfig/Dockerfile.frontend
     container_name: kartolo-frontend
     ports:
       - "127.0.0.1:8080:8080"
     env_file:
       - ../frontend_kartoloapps/.env
+    volumes:
+      - ../frontend_kartoloapps/logs:/app/logs
     restart: unless-stopped
     networks:
       - kartolo
