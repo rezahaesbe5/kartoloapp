@@ -55,6 +55,8 @@ services:
       - "127.0.0.1:3000:3000"
     env_file:
       - ../backend_gatewayauth/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ../backend_gatewayauth/logs:/app/logs
     depends_on:
@@ -71,8 +73,13 @@ services:
     container_name: kartolo-administration
     env_file:
       - ../backend_administration/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ../backend_administration/logs:/app/logs
+      - ../backend_gatewayauth/logs:/app/logs/gateway:ro
+      - ../frontend_kartoloapps/logs:/app/logs/frontend:ro
+      - ./logloki:/app/logloki
     depends_on:
       redis:
         condition: service_healthy
@@ -89,9 +96,9 @@ services:
     container_name: kartolo-frontend
     ports:
       - "127.0.0.1:8080:8080"
-    env_file:
-      - ../frontend_kartoloapps/.env
     volumes:
+      # Inject runtime config via mount (micro-server reads file at start)
+      - ../frontend_kartoloapps/.env:/app/.env.frontend:ro
       - ../frontend_kartoloapps/logs:/app/logs
     restart: unless-stopped
     networks:

@@ -56,7 +56,7 @@ export const logsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     const result = accessLog(body.source_app as SourceApp, body.date);
     if (result.status === 'source_missing') {
       throw new AppError('not_found', {
-        message: `File log ${body.source_app}/${body.date} tidak ditemukan.`,
+        message: `File log untuk ${body.source_app} tanggal ${body.date} tidak ditemukan di sistem.`,
         code: 'LOG_FILE_NOT_FOUND',
         details: { source_path: result.source_path },
       });

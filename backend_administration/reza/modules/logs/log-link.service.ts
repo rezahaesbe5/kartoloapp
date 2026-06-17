@@ -75,7 +75,17 @@ export function linkFileIntoLoki(sourceFilePath: string): LinkResult['status'] {
       const relTarget = path.relative(LOKI_DIR, path.resolve(sourceFilePath));
       fs.symlinkSync(relTarget, dest);
     } else {
-      fs.linkSync(sourceFilePath, dest);
+      try {
+        fs.linkSync(sourceFilePath, dest);
+      } catch (err) {
+        // EXDEV: cross-device link not permitted (beda mount/filesystem).
+        // Fallback ke copyFileSync agar fitur tetap jalan di Docker/WSL.
+        if ((err as NodeJS.ErrnoException).code === 'EXDEV') {
+          fs.copyFileSync(sourceFilePath, dest);
+        } else {
+          throw err;
+        }
+      }
     }
     return 'linked';
   } catch (err) {
