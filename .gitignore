@@ -1,0 +1,59 @@
+# =============================================================================
+# Kartolo SuperApps — Root .gitignore (source-based deploy)
+#
+# Repo ini berisi SOURCE lengkap (frontend + 2 backend) + dockerconfig/.
+# Docker build dari source (npm run build di dalam container) — TIDAK ada
+# folder build/ atau dist/ pre-compiled yang di-commit.
+# =============================================================================
+
+# Dependencies — di-install saat docker build via npm ci
+node_modules/
+*/node_modules/
+
+# Build output — di-generate di dalam container (TIDAK di-commit)
+dist/
+*/dist/
+dist-ssr/
+*.tsbuildinfo
+
+# Environment secrets — dibuat manual di VPS dari .example
+.env
+.env.local
+.env.*.local
+backend_gatewayauth/.env
+backend_administration/.env
+frontend_kartoloapps/.env
+dockerconfig/.env.gateway
+dockerconfig/.env.administration
+dockerconfig/.env.frontend
+*.pem
+*.key
+*.crt
+
+# Git credentials — token GitHub PAT (JANGAN PERNAH commit)
+.git-credentials
+
+# Local tooling — Claude Code workflows & scripts
+.claude/
+CLAUDE.md
+
+# Logs runtime
+logs/
+# Negation: backend_administration punya MODUL `logs/` (source) — JANGAN di-ignore.
+!backend_administration/reza/modules/logs/
+!backend_administration/src/**/logs/
+logloki/
+*.log
+*.pid
+*.tmp
+*.temp
+dev.log
+dev.pid
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,105 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: kartolo-redis
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - kartolo-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - kartolo
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: kartolo-loki
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - kartolo-loki-data:/loki
+    restart: unless-stopped
+    networks:
+      - kartolo
+
+  alloy:
+    image: grafana/alloy:v1.7.1
+    container_name: kartolo-alloy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=0.0.0.0:12345
+    expose:
+      - "12345"
+    volumes:
+      - ./infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ../logloki:/logs-root/logloki
+      - kartolo-alloy-data:/var/lib/alloy/data
+    depends_on:
+      loki:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - kartolo
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: dockerconfig/Dockerfile.gateway
+    container_name: kartolo-gateway
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env.gateway
+    volumes:
+      - ../logloki:/app/logloki
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - kartolo
+
+  administration:
+    build:
+      context: ..
+      dockerfile: dockerconfig/Dockerfile.administration
+    container_name: kartolo-administration
+    env_file:
+      - .env.administration
+    volumes:
+      - ../logloki:/app/logloki
+    depends_on:
+      redis:
+        condition: service_healthy
+      gateway:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - kartolo
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: dockerconfig/Dockerfile.frontend
+    container_name: kartolo-frontend
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./.env.frontend:/app/.env.frontend:ro
+    restart: unless-stopped
+    networks:
+      - kartolo
+
+networks:
+  kartolo:
+    driver: bridge
+
+volumes:
+  kartolo-redis-data:
+  kartolo-loki-data:
+  kartolo-alloy-data:

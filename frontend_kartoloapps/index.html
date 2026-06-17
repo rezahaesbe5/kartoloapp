@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#22C55E" />
+    <meta name="description" content="Kartolo SuperApps — Portal terpusat untuk seluruh produk digital organisasi Anda." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <title>Kartolo SuperApps</title>
+    <!-- Runtime env: micro-server (production) mengganti __APP_ENV_JSON__ dengan
+         nilai dari .env.frontend saat container start. Dev (vite) di-replace jadi {}
+         oleh plugin di vite.config.ts → FE fallback ke import.meta.env. -->
+    <script>window.__APP_ENV__ = __APP_ENV_JSON__;</script>
+  </head>
+  <body class="bg-surface text-ink antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

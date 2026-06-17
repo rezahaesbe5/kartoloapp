@@ -1,0 +1,271 @@
+// Kartolo SuperApps — Gateway Auth schema
+// MVP scope: tabel inti untuk Phase 0 + Phase 1 (auth).
+// Sisa tabel (units, roles, products, gateway_*, audit_logs, dll) ditambah per-phase.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["gateway_auth"]
+}
+
+enum UserType {
+  superadmin // 1
+  admin      // 2
+  member     // 3
+
+  @@schema("gateway_auth")
+}
+
+enum UserStatus {
+  active
+  inactive
+  force_change_password
+  blocked
+
+  @@schema("gateway_auth")
+}
+
+model User {
+  id                       String     @id @default(uuid()) @db.Uuid
+  email                    String     @unique
+  username                 String?    @unique
+  passwordHash             String     @map("password_hash")
+  fullName                 String     @map("full_name")
+  userType                 UserType   @map("user_type")
+  status                   UserStatus @default(active)
+  emailVerifiedAt          DateTime?  @map("email_verified_at")
+  twoFactorEnabled         Boolean    @default(false) @map("two_factor_enabled")
+  twoFactorSecretEncrypted String?    @map("two_factor_secret_encrypted")
+  twoFactorEnrolledAt      DateTime?  @map("two_factor_enrolled_at")
+  lastLoginAt              DateTime?  @map("last_login_at")
+  failedLoginAttempts      Int        @default(0) @map("failed_login_attempts")
+  lockedUntil              DateTime?  @map("locked_until")
+  createdAt                DateTime   @default(now()) @map("created_at")
+  updatedAt                DateTime   @updatedAt @map("updated_at")
+
+  sessions      Session[]
+  recoveryCodes MfaRecoveryCode[]
+  roleMappings  MapUserRole[]
+
+  @@index([email])
+  @@index([username])
+  @@index([status])
+  @@map("users")
+  @@schema("gateway_auth")
+}
+
+// === Master Role ===============================================================
+// mst_role — daftar role aplikasi. Role user dimapping lewat map_user_role
+// (many-to-many). user_type=superadmin akses semua role secara implisit.
+
+model MstRole {
+  id       Int    @id @default(autoincrement())
+  namaRole String @unique @map("nama_role")
+
+  userMappings MapUserRole[]
+
+  @@map("mst_role")
+  @@schema("gateway_auth")
+}
+
+// === Mapping Role per User =====================================================
+// map_user_role — relasi many-to-many user ↔ role (global, lintas produk).
+// Visibilitas produk = irisan role user dengan mst_produk.role_list.
+// superadmin bypass (akses semua produk & menu tanpa butuh mapping).
+
+model MapUserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  roleId    Int      @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role MstRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("map_user_role")
+  @@schema("gateway_auth")
+}
+
+// Recovery codes untuk MFA. Sekali pakai, hashed (argon2). Di-generate
+// otomatis saat confirmEnrollment, bisa di-regenerate via endpoint khusus
+// (verify TOTP dulu). Di-cascade delete saat disableMfa.
+model MfaRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@map("mfa_recovery_codes")
+  @@schema("gateway_auth")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash")
+  ip               String?
+  userAgent        String?   @map("user_agent")
+  lastActiveAt     DateTime  @default(now()) @map("last_active_at")
+  expiresAt        DateTime  @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([userId, revokedAt, expiresAt])
+  @@map("sessions")
+  @@schema("gateway_auth")
+}
+
+// === API Gateway Management ====================================================
+// cfg_client       — daftar client (FE web, mobile, partner) yang boleh hit gateway
+// mst_endpoint     — katalog semua endpoint yang dikenal gateway
+// map_client_endpoint — whitelist: client X boleh akses endpoint Y
+// Lihat plan: shimmying-snacking-goose.md
+
+model CfgClient {
+  clientId          String   @id @map("client_id")
+  clientKey         String   @map("client_key")
+  clientDescription String   @map("client_description")
+  ipList            String   @map("ip_list")
+  timestampFlag     Boolean  @default(true) @map("timestamp_flag")
+  signatureFlag     Boolean  @default(true) @map("signature_flag")
+  endpointFlag      Boolean  @default(true) @map("endpoint_flag")
+  activeFlag        Boolean  @default(true) @map("active_flag")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  endpointMappings MapClientEndpoint[]
+
+  @@map("cfg_client")
+  @@schema("gateway_auth")
+}
+
+model MstEndpoint {
+  id                  Int      @id @default(autoincrement())
+  endpointUrl         String   @map("endpoint_url")
+  endpointName        String   @map("endpoint_name")
+  endpointDescription String   @map("endpoint_description")
+  endpointMethod      String   @map("endpoint_method")
+  authFlag            Boolean  @default(true) @map("auth_flag")
+  activeFlag          Boolean  @default(true) @map("active_flag")
+  // Bila terisi: gateway meneruskan request ke base URL ini (mis. http://localhost:3001).
+  // Bila null: endpoint dilayani route lokal di backend_gatewayauth.
+  backendUrl          String?  @map("backend_url")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  clientMappings MapClientEndpoint[]
+
+  @@unique([endpointUrl, endpointMethod])
+  @@map("mst_endpoint")
+  @@schema("gateway_auth")
+}
+
+model MapClientEndpoint {
+  clientId   String   @map("client_id")
+  endpointId Int      @map("endpoint_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  client   CfgClient   @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  endpoint MstEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@id([clientId, endpointId])
+  @@index([endpointId])
+  @@map("map_client_endpoint")
+  @@schema("gateway_auth")
+}
+
+// === Master Produk =============================================================
+// mst_produk — katalog produk Kartolo SuperApps yang tampil di Portal.
+// user_type_list: kode user_type yang boleh akses, dipisah ";" (1=superadmin,
+// 2=admin, 3=member). Contoh "1;2" → hanya superadmin & admin.
+
+model MstProduk {
+  id           Int     @id @default(autoincrement())
+  namaProduk   String  @map("nama_produk")
+  roleList     String? @map("role_list")
+  urlProduk    String? @map("url_produk")
+  activeFlag   Boolean @default(true) @map("active_flag")
+
+  menus MapMenuProduk[]
+
+  @@map("mst_produk")
+  @@schema("gateway_auth")
+}
+
+// === Mapping Menu per Produk ===================================================
+// map_menu_produk — definisi menu navigasi tiap produk, dengan struktur
+// induk/anak dan kontrol akses per-role.
+//  - main_menu_id : 0 = menu induk; selain itu = id menu induk (menu anak).
+//  - single_menu_flag : true = menu tunggal (langsung punya url); false = menu
+//    grup (induk yang menampung anak, url_name null).
+//  - url_name : null untuk menu grup; berisi segmen URL untuk menu single/anak.
+//  - icon : kelas FontAwesome 5 (mis. "fas fa-home") untuk menu induk/single;
+//    null untuk menu anak.
+//  - role_id_list : id role yang boleh akses, dipisah ";". superadmin bypass.
+
+model MapMenuProduk {
+  id             Int     @id @default(autoincrement())
+  menuName       String  @map("menu_name")
+  urlName        String? @map("url_name")
+  mainMenuId     Int     @default(0) @map("main_menu_id")
+  singleMenuFlag Boolean @default(false) @map("single_menu_flag")
+  icon           String?
+  produkId       Int     @map("produk_id")
+  roleIdList     String  @map("role_id_list")
+  activeFlag     Boolean @default(true) @map("active_flag")
+
+  produk MstProduk @relation(fields: [produkId], references: [id], onDelete: Cascade)
+
+  @@index([produkId])
+  @@map("map_menu_produk")
+  @@schema("gateway_auth")
+}
+
+// === Audit Log =================================================================
+// audit_logs — jejak audit aksi sensitif (login, logout, ganti password, dll).
+// Volume rendah, retensi panjang (PRD §3.2: min 1 tahun). user_id sengaja TIDAK
+// di-relasikan sebagai FK supaya audit tetap utuh walau user dihapus, dan bisa
+// null untuk aksi sistem / login gagal dengan identifier tidak dikenal.
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  traceId       String?  @map("trace_id")
+  sourceApp     String?  @map("source_app")
+  userId        String?  @map("user_id") @db.Uuid
+  clientId      String?  @map("client_id")
+  action        String
+  endpoint      String?
+  method        String?
+  message       String?
+  requestHeader Json?    @map("request_header")
+  requestBody   Json?    @map("request_body")
+  responseBody  Json?    @map("response_body")
+  userData      Json?    @map("user_data")
+  ip            String?
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([endpoint])
+  @@index([createdAt])
+  @@index([traceId])
+  @@map("audit_logs")
+  @@schema("gateway_auth")
+}

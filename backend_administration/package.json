@@ -1,0 +1,34 @@
+{
+  "name": "backend_administration",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kartolo SuperApps — Administration backend (audit log, dll). Diakses hanya via gateway.",
+  "type": "module",
+  "scripts": {
+    "dev": "CHOKIDAR_USEPOLLING=true CHOKIDAR_INTERVAL=1000 tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/server.js",
+    "prisma:generate": "prisma generate",
+    "lint": "eslint \"src/**/*.ts\" \"reza/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"reza/**/*.ts\""
+  },
+  "dependencies": {
+    "@fastify/websocket": "^10.0.1",
+    "@prisma/client": "^5.22.0",
+    "argon2": "^0.44.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "ioredis": "^5.11.1",
+    "nanoid": "^5.0.7",
+    "ws": "^8.21.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/ws": "^8.18.1",
+    "pino-pretty": "^11.2.2",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

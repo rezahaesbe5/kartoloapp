@@ -1,0 +1,18 @@
+# Frontend = static Vite build + micro-server (server.mjs).
+# Build context = project root (lihat docker-compose.yml: context: ..).
+# Nilai env (VITE_*) TIDAK di-bake ke bundle JS. server.mjs baca .env.frontend
+# saat container start lalu inject ke index.html (window.__APP_ENV__).
+FROM node:22-alpine
+WORKDIR /app
+
+# 1) Install dependency
+COPY frontend_kartoloapps/package.json frontend_kartoloapps/package-lock.json ./
+RUN npm install
+
+# 2) Copy source, build static files
+COPY frontend_kartoloapps/ ./
+RUN npm run build
+
+# 3) Copy server.mjs (it is in source)
+EXPOSE 8080
+CMD ["node", "server.mjs"]

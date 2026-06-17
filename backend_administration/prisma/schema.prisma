@@ -1,0 +1,161 @@
+// Kartolo SuperApps — Administration backend.
+//
+// CATATAN PENTING: service ini TIDAK memiliki migrasi sendiri. Tabel
+// gateway_auth.audit_logs dimiliki & dimigrasi oleh backend_gatewayauth.
+// Model di bawah cermin schema gateway untuk Prisma Client. Defaults
+// (id uuid, createdAt now) dideklarasikan supaya .create() di sini bisa
+// memanggil tanpa menyebut id/createdAt — DB sendiri juga punya default
+// yang sama dari migrasi gateway, jadi konsisten.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["gateway_auth"]
+}
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  traceId       String?  @map("trace_id")
+  sourceApp     String?  @map("source_app")
+  userId        String?  @map("user_id") @db.Uuid
+  clientId      String?  @map("client_id")
+  action        String
+  endpoint      String?
+  method        String?
+  message       String?
+  requestHeader Json?    @map("request_header")
+  requestBody   Json?    @map("request_body")
+  responseBody  Json?    @map("response_body")
+  userData      Json?    @map("user_data")
+  ip            String?
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([endpoint])
+  @@index([createdAt])
+  @@index([traceId])
+  @@map("audit_logs")
+  @@schema("gateway_auth")
+}
+
+// Cermin gateway_auth.mst_role — milik & dimigrasi oleh backend_gatewayauth.
+// Model ini hanya supaya backend_administration bisa CRUD via Prisma Client.
+model MstRole {
+  id       Int    @id @default(autoincrement())
+  namaRole String @unique @map("nama_role")
+
+  @@map("mst_role")
+  @@schema("gateway_auth")
+}
+
+// Cermin gateway_auth.users — milik & dimigrasi oleh backend_gatewayauth.
+// UserType & UserStatus enum harus didefinisikan ulang di sini (tidak bisa
+// cross-schema), lalu dipakai di field userType dan status.
+enum UserType {
+  superadmin
+  admin
+  member
+
+  @@schema("gateway_auth")
+}
+
+enum UserStatus {
+  active
+  inactive
+  force_change_password
+  blocked
+
+  @@schema("gateway_auth")
+}
+
+model User {
+  id                       String     @id @default(uuid()) @db.Uuid
+  email                    String     @unique
+  username                 String?    @unique
+  passwordHash             String     @map("password_hash")
+  fullName                 String     @map("full_name")
+  userType                 UserType   @map("user_type")
+  status                   UserStatus
+  emailVerifiedAt          DateTime?  @map("email_verified_at")
+  twoFactorEnabled         Boolean    @default(false) @map("two_factor_enabled")
+  twoFactorSecretEncrypted String?    @map("two_factor_secret_encrypted")
+  twoFactorEnrolledAt      DateTime?  @map("two_factor_enrolled_at")
+  lastLoginAt              DateTime?  @map("last_login_at")
+  failedLoginAttempts      Int        @default(0) @map("failed_login_attempts")
+  lockedUntil              DateTime?  @map("locked_until")
+  createdAt                DateTime   @default(now()) @map("created_at")
+  updatedAt                DateTime   @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("users")
+  @@schema("gateway_auth")
+}
+
+// Cermin gateway_auth.mst_produk — milik & dimigrasi oleh backend_gatewayauth.
+// Dipakai admin untuk menampilkan daftar produk + role_list di modal mapping role.
+model MstProduk {
+  id         Int     @id @default(autoincrement())
+  namaProduk String  @map("nama_produk")
+  roleList   String? @map("role_list")
+  urlProduk  String? @map("url_produk")
+  activeFlag Boolean @default(true) @map("active_flag")
+
+  @@map("mst_produk")
+  @@schema("gateway_auth")
+}
+
+// Cermin gateway_auth.map_menu_produk — milik & dimigrasi oleh backend_gatewayauth.
+// Dipakai admin untuk validasi: role tidak boleh dihapus bila masih dipakai di
+// role_id_list menu (";"-separated).
+model MapMenuProduk {
+  id             Int     @id @default(autoincrement())
+  menuName       String  @map("menu_name")
+  urlName        String? @map("url_name")
+  mainMenuId     Int     @default(0) @map("main_menu_id")
+  singleMenuFlag Boolean @default(false) @map("single_menu_flag")
+  icon           String?
+  produkId       Int     @map("produk_id")
+  roleIdList     String  @map("role_id_list")
+  activeFlag     Boolean @default(true) @map("active_flag")
+
+  @@index([produkId])
+  @@map("map_menu_produk")
+  @@schema("gateway_auth")
+}
+
+// Cermin gateway_auth.map_user_role — milik & dimigrasi oleh backend_gatewayauth.
+// Admin mengelola mapping role per user lewat tabel ini (replace-all saat simpan).
+model MapUserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  roleId    Int      @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("map_user_role")
+  @@schema("gateway_auth")
+}
+
+// Cermin gateway_auth.mfa_recovery_codes — milik & dimigrasi oleh backend_gatewayauth.
+// Model ini hanya supaya backend_administration bisa menghapus recovery code milik
+// user saat admin men-disable MFA-nya (admin override, tanpa verifikasi TOTP).
+model MfaRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, usedAt])
+  @@map("mfa_recovery_codes")
+  @@schema("gateway_auth")
+}
