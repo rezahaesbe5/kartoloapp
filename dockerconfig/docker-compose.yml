@@ -48,13 +48,13 @@ services:
 
   gateway:
     build:
-      context: ..
-      dockerfile: dockerconfig/Dockerfile.gateway
+      context: ../backend_gatewayauth
+      dockerfile: Dockerfile
     container_name: kartolo-gateway
     ports:
       - "127.0.0.1:3000:3000"
     env_file:
-      - .env.gateway
+      - ../backend_gatewayauth/.env
     volumes:
       - ../logloki:/app/logloki
     depends_on:
@@ -66,11 +66,11 @@ services:
 
   administration:
     build:
-      context: ..
-      dockerfile: dockerconfig/Dockerfile.administration
+      context: ../backend_administration
+      dockerfile: Dockerfile
     container_name: kartolo-administration
     env_file:
-      - .env.administration
+      - ../backend_administration/.env
     volumes:
       - ../logloki:/app/logloki
     depends_on:
@@ -84,13 +84,13 @@ services:
 
   frontend:
     build:
-      context: ..
-      dockerfile: dockerconfig/Dockerfile.frontend
+      context: ../frontend_kartoloapps
+      dockerfile: Dockerfile
     container_name: kartolo-frontend
     ports:
       - "127.0.0.1:8080:8080"
-    volumes:
-      - ./.env.frontend:/app/.env.frontend:ro
+    env_file:
+      - ../frontend_kartoloapps/.env
     restart: unless-stopped
     networks:
       - kartolo
