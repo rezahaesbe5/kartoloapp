@@ -13,13 +13,11 @@ import type { ApiEnvelope } from '@/shared/types/envelope';
 
 export type SourceApp =
   | 'backend_gatewayauth'
-  | 'backend_administration'
-  | 'frontend_kartoloapps';
+  | 'backend_administration';
 
 export const SOURCE_APP_LABEL: Record<SourceApp, string> = {
   backend_gatewayauth: 'Backend Gateway Auth',
   backend_administration: 'Backend Administration',
-  frontend_kartoloapps: 'Frontend Kartolo Apps',
 };
 
 // ---- Filter (Navicat-like) -------------------------------------------------

@@ -35,8 +35,8 @@ const EnvSchema = z.object({
   // Body > nilai ini (byte) akan di-truncate sebelum ditulis ke log.
   LOG_BODY_MAX_BYTES: z.coerce.number().int().positive().default(32768),
   // Path direktori log peer (utk fitur Akses Log File yg link file lintas-service).
+  // Di Docker di-mount ke /app/peer-logs/gateway (NON-NESTED — hindari nested bind mount).
   PEER_GATEWAY_LOG_DIR: z.string().default('../backend_gatewayauth/logs'),
-  PEER_FRONTEND_LOG_DIR: z.string().default('../frontend_kartoloapps/logs'),
   // Shared secret antara gateway↔admin untuk validate upstream WS handshake.
   // WAJIB diset di production. Default value dipakai dev convenience saja.
   INTERNAL_WS_SECRET: z.string().min(8).default('dev-internal-ws-secret-change-me'),

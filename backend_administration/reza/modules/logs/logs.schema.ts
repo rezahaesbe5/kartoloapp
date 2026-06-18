@@ -9,7 +9,6 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const SourceAppEnum = z.enum([
   'backend_gatewayauth',
   'backend_administration',
-  'frontend_kartoloapps',
 ]);
 
 export const FilterRowSchema = z.object({

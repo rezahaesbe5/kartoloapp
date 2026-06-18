@@ -35,7 +35,6 @@ dockerconfig/.env.frontend
 
 # Local tooling — Claude Code workflows & scripts
 .claude/
-CLAUDE.md
 
 # Logs runtime
 logs/

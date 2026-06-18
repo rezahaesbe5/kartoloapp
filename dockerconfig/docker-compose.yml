@@ -77,8 +77,9 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ../backend_administration/logs:/app/logs
-      - ../backend_gatewayauth/logs:/app/logs/gateway:ro
-      - ../frontend_kartoloapps/logs:/app/logs/frontend:ro
+      # Peer log gateway di-mount ke path NON-NESTED (bukan di dalam /app/logs) —
+      # nested bind mount di Docker Desktop/WSL tidak ter-mount secara andal.
+      - ../backend_gatewayauth/logs:/app/peer-logs/gateway:ro
       - ./logloki:/app/logloki
     depends_on:
       redis:

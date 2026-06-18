@@ -6,7 +6,6 @@
 // Sumber log yang didukung (prefix = APP_ID — sinkron dgn DailyRotatingWriter):
 //   - backend_gatewayauth     → <PEER_GATEWAY_LOG_DIR>/backend_gatewayauth-YYYY-MM-DD.log
 //   - backend_administration  → <LOG_DIR>/backend_administration-YYYY-MM-DD.log
-//   - frontend_kartoloapps    → <PEER_FRONTEND_LOG_DIR>/frontend_kartoloapps-YYYY-MM-DD.log
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,20 +15,17 @@ const LOKI_DIR = path.resolve(env.LOGLOKI_DIR);
 
 export type SourceApp =
   | 'backend_gatewayauth'
-  | 'backend_administration'
-  | 'frontend_kartoloapps';
+  | 'backend_administration';
 
 export const SOURCE_APPS: SourceApp[] = [
   'backend_gatewayauth',
   'backend_administration',
-  'frontend_kartoloapps',
 ];
 
 // Prefix = APP_ID per source — sinkron dgn DailyRotatingWriter di tiap app.
 const PREFIX: Record<SourceApp, string> = {
   backend_gatewayauth: 'backend_gatewayauth-',
   backend_administration: 'backend_administration-',
-  frontend_kartoloapps: 'frontend_kartoloapps-',
 };
 
 export interface LinkResult {
@@ -52,8 +48,6 @@ function dirFor(sourceApp: SourceApp): string {
       return path.resolve(env.PEER_GATEWAY_LOG_DIR);
     case 'backend_administration':
       return path.resolve(env.LOG_DIR);
-    case 'frontend_kartoloapps':
-      return path.resolve(env.PEER_FRONTEND_LOG_DIR);
   }
 }
 

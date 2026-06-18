@@ -1,12 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import { initClientLogger } from './shared/lib/logger';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import './index.css';
 
-// Logger client: tangkap error JS & kegagalan API, kirim batch ke backend.
-initClientLogger();
+// Client logger DINONAKTIFKAN: frontend tidak lagi mencatat/mengirim log ke
+// backend. Kode logger.ts & route gateway /logs/client dibiarkan dormant.
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Element #root tidak ditemukan');

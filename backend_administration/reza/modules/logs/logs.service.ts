@@ -16,8 +16,8 @@ export function dayBoundsNs(date: string): { startNs: string; endNs: string } {
   };
 }
 
-function sourceToLabel(sourceApp: SourceApp): 'backend' | 'frontend' {
-  return sourceApp === 'frontend_kartoloapps' ? 'frontend' : 'backend';
+function sourceToLabel(_sourceApp: SourceApp): 'backend' {
+  return 'backend';
 }
 
 export interface SearchParams {
