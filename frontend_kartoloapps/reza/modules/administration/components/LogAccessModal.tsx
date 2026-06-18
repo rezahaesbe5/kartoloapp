@@ -311,8 +311,12 @@ export function LogAccessModal({ open, onClose }: LogAccessModalProps) {
     setStreamError(null);
 
     sock.setHandlers({
-      onStatus: setStreamStatus,
-      onError: (msg) => setStreamError(msg),
+      onStatus: (s) => {
+        setStreamStatus(s);
+      },
+      onError: (msg) => {
+        setStreamError(msg);
+      },
       onEntry: (item) => {
         setRecentItems((prev) => {
           const merged = [...prev, item];
@@ -321,14 +325,23 @@ export function LogAccessModal({ open, onClose }: LogAccessModalProps) {
       },
     });
 
-    void sock.start({ source_app: sourceApp, date, filters: activeFilters(filters) });
+    const runStart = async () => {
+      try {
+        await sock.start({ source_app: sourceApp, date, filters: activeFilters(filters) });
+      } catch (err) {
+        // error sudah ditangani di dalam sock via handler
+      }
+    };
+    void runStart();
 
     return () => {
       sock.stop();
-      socketRef.current = null;
+      if (socketRef.current === sock) {
+        socketRef.current = null;
+      }
     };
     // sengaja: filters mengubah array → reconnect dgn filter baru.
-  }, [streaming, accessed, sourceApp, date, filters, stopStreamInternal]);
+  }, [streaming, accessed, sourceApp, date, filters]); // stopStreamInternal dihapus dari deps karena sudah ada di dalam cleanup
 
   // ---- Auto-scroll ------------------------------------------------------
   useEffect(() => {

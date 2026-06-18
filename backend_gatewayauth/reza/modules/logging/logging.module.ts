@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { backendWriter, frontendWriter } from './log-writer.js';
+import { backendWriter } from './log-writer.js';
 import { logsRoutes } from './logs.controller.js';
 import { registerLogsWsProxy } from './logs-ws-proxy.js';
 import { purgeOldLogs } from './retention.service.js';
@@ -23,7 +23,8 @@ export const loggingModule = {
 
     // 2. Init writer (buat file hari ini) — tanpa onRotate hardlink ke logloki/.
     backendWriter.init();
-    frontendWriter.init();
+    // frontendWriter dinonaktifkan per 2026-06-18 (user request: FE tidak catat log ke file).
+    // frontendWriter.init();
 
     // 3. Endpoint /api/v1/logs/* yang ditangani LOKAL gateway:
     //    /client (ingest FE), /ws-ticket (issue ticket), /audit, /health.
@@ -37,7 +38,7 @@ export const loggingModule = {
 
     app.addHook('onClose', async () => {
       backendWriter.close();
-      frontendWriter.close();
+      // frontendWriter.close(); // dinonaktifkan
     });
   },
 };

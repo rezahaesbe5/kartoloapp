@@ -35,13 +35,27 @@ export interface StartParams {
 }
 
 function wsBase(): string {
-  // env.apiBaseUrl mis. "http://localhost:3000/api/v1" → buang trailing path.
-  const u = new URL(env.apiBaseUrl);
-  u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
-  u.pathname = '';
-  u.search = '';
-  u.hash = '';
-  return u.toString().replace(/\/+$/, '');
+  // env.apiBaseUrl mis. "http://localhost:3000/api/v1" atau "/api/v1" (relative).
+  let baseUrl = env.apiBaseUrl;
+
+  // Jika relative path (mis. "/api/v1"), gunakan window.location sebagai base.
+  if (baseUrl.startsWith('/')) {
+    baseUrl = `${window.location.origin}${baseUrl}`;
+  }
+
+  try {
+    const u = new URL(baseUrl);
+    u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+    u.pathname = '';
+    u.search = '';
+    u.hash = '';
+    return u.toString().replace(/\/+$/, '');
+  } catch (err) {
+    console.error('Failed to construct WebSocket URL from:', baseUrl, err);
+    // Fallback kasar jika URL tetap tidak valid
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${wsProto}//${window.location.host}`;
+  }
 }
 
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 15000, 30000];
@@ -64,8 +78,8 @@ export class LogStreamSocket {
   }
 
   async start(params: StartParams): Promise<void> {
+    if (this.manualStop) return;
     this.params = params;
-    this.manualStop = false;
     this.retryIdx = 0;
     await this.connect();
   }
@@ -75,11 +89,12 @@ export class LogStreamSocket {
     this.clearRetry();
     if (this.socket) {
       try {
-        this.socket.close(1000, 'client_stop');
+        const s = this.socket;
+        this.socket = null;
+        s.close(1000, 'client_stop');
       } catch {
         // ignore
       }
-      this.socket = null;
     }
     this.setStatus('closed');
   }
@@ -92,6 +107,7 @@ export class LogStreamSocket {
   }
 
   private setStatus(s: LogStreamStatus): void {
+    if (this.manualStop && s !== 'closed') return;
     this.status = s;
     this.handlers.onStatus?.(s);
   }
@@ -103,7 +119,9 @@ export class LogStreamSocket {
     let ticketResp;
     try {
       ticketResp = await requestWsTicket(this.params);
+      if (this.manualStop) return;
     } catch (err) {
+      if (this.manualStop) return;
       this.handlers.onError?.((err as Error).message ?? 'gagal request ticket');
       this.scheduleReconnect();
       return;
@@ -112,8 +130,10 @@ export class LogStreamSocket {
     const url = `${wsBase()}/api/v1/logs/ws?ticket=${encodeURIComponent(ticketResp.ticket)}`;
     let sock: WebSocket;
     try {
+      if (this.manualStop) return;
       sock = new WebSocket(url);
     } catch (err) {
+      if (this.manualStop) return;
       this.handlers.onError?.((err as Error).message ?? 'gagal buka WebSocket');
       this.scheduleReconnect();
       return;

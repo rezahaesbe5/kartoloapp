@@ -93,7 +93,10 @@ export class DailyRotatingWriter {
 // Prefix file = APP_ID (mis. "backend_gatewayauth-YYYY-MM-DD.log") supaya tiap
 // app punya identitas unik di nama file — konsisten dgn pola admin.
 export const backendWriter = new DailyRotatingWriter(env.LOG_DIR, env.APP_ID);
+/*
+frontendWriter dinonaktifkan per 2026-06-18 (user request).
 export const frontendWriter = new DailyRotatingWriter(
   env.FRONTEND_LOG_DIR,
   'frontend_kartoloapps',
 );
+*/

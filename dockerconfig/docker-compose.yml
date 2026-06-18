@@ -100,7 +100,6 @@ services:
     volumes:
       # Inject runtime config via mount (micro-server reads file at start)
       - ../frontend_kartoloapps/.env:/app/.env.frontend:ro
-      - ../frontend_kartoloapps/logs:/app/logs
     restart: unless-stopped
     networks:
       - kartolo

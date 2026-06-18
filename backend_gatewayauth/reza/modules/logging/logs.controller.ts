@@ -15,7 +15,7 @@ import { AppError } from '../../../src/shared/errors/app-error.js';
 import { successEnvelope } from '../../../src/shared/errors/envelope.js';
 import { authRequired } from '../../../src/shared/middleware/auth-required.js';
 import { searchAuditLogs } from './audit.service.js';
-import { frontendWriter } from './log-writer.js';
+// import { frontendWriter } from './log-writer.js'; // dinonaktifkan
 import { lokiReady } from './loki-client.js';
 import { issueWsTicket } from './ws-ticket.service.js';
 
@@ -109,30 +109,18 @@ export const logsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // POST /client — ingest batch log dari frontend (signed, tanpa Bearer).
   app.post('/client', async (req, reply) => {
     const input = ClientLogBatchSchema.parse(req.body);
+    /*
+    Pencatatan log frontend ke file DINONAKTIFKAN per 2026-06-18 (user request).
+    Log frontend tetap mengalir ke Alloy/Loki via stdout container jika diperlukan,
+    tapi tidak lagi ditulis ke folder logs/ oleh gateway.
     const tsIngest = new Date().toISOString();
     for (const entry of input.logs) {
-      frontendWriter.write({
-        source: 'frontend',
-        app: entry.app ?? 'frontend_unknown',
-        level: entry.level ?? 'info',
-        trace_id: entry.trace_id ?? null,
-        ts_request: entry.ts_request ?? tsIngest,
-        ts_ingest: tsIngest,
-        message: entry.message ?? null,
-        error_stack: entry.error_stack ?? null,
-        page_url: entry.page_url ?? null,
-        endpoint: entry.endpoint ?? null,
-        status: entry.status ?? null,
-        user_data: entry.user_data ?? null,
-        user_agent: req.headers['user-agent'] ?? null,
-        ip: req.ip,
-        client_id: req.gwClient?.clientId ?? null,
-        meta: entry.meta ?? null,
-      });
+      frontendWriter.write({ ... });
     }
+    */
     return reply
       .status(200)
-      .send(successEnvelope(req.id as string, { accepted: input.logs.length }, 'Log diterima'));
+      .send(successEnvelope(req.id as string, { accepted: input.logs.length }, 'Log diterima (ingest disabled)'));
   });
 
   // POST /ws-ticket — terbitkan ticket short-lived untuk handshake WS.

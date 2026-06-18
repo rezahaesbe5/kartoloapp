@@ -241,6 +241,16 @@ Detail: memory `feedback_thorough_verification`.
 
 ## Project History (kronologis, terbaru di atas)
 
+### 2026-06-18 Sesi 3 — Fix Live Stream WS + Log Separation + Cleanup
+- **Fix "Invalid URL" pada Live Stream**: Error `Failed to construct 'URL'` di frontend dipicu karena `VITE_API_BASE_URL` relatif (`/api/v1`). Diperbaiki di [logs-ws.ts](frontend_kartoloapps/reza/modules/administration/api/logs-ws.ts) dengan deteksi `window.location.origin`.
+- **Fix Race Condition WebSocket**: Error kanal pesan tertutup diperbaiki dengan menambahkan proteksi `manualStop` di `LogStreamSocket` agar tidak melakukan transisi status setelah komponen di-*unmount*.
+- **Pemisahan Log Administration**: Mengubah `LOGLOKI_DIR` dari `./logs` ke `./logloki` agar file link (peer logs) tidak mencampuri file log asli administration.
+- **Matikan Logging Frontend Total**:
+  - Menghapus `frontendWriter` dari `backend_gatewayauth`.
+  - Menonaktifkan ingest di `logs.controller.ts`.
+  - Menghapus volume mount `/app/logs` frontend di `docker-compose.yml`.
+- **Cleanup & Verification**: Reset folder logs di host, rebuild images, dan verifikasi folder logs sekarang murni berisi file service-nya sendiri (gateway hanya gateway, admin hanya admin).
+
 ### 2026-06-18 Sesi 2 — Fix Akses File Log: nested bind mount → source_missing
 - **Symptom**: Akses File Log (menu `auditlog`) source `backend_gatewayauth` → error
   "File log untuk backend_gatewayauth tanggal YYYY-MM-DD tidak ditemukan di sistem", padahal
