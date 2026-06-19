@@ -8,6 +8,7 @@ export interface SessionItem {
   id: string;
   ip: string | null;
   user_agent: string | null;
+  source_app: string | null;
   created_at: string;
   last_active_at: string;
   expires_at: string;
@@ -35,6 +36,7 @@ export async function listMySessions(
       id: r.id,
       ip: r.ip,
       user_agent: r.userAgent,
+      source_app: r.sourceApp,
       created_at: r.createdAt.toISOString(),
       last_active_at: r.lastActiveAt.toISOString(),
       expires_at: r.expiresAt.toISOString(),

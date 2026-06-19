@@ -241,6 +241,28 @@ Detail: memory `feedback_thorough_verification`.
 
 ## Project History (kronologis, terbaru di atas)
 
+### 2026-06-19 — Session `source_app`: login lintas source app
+- **Masalah**: single-session enforcement menolak login (`ALREADY_LOGGED_IN`) saat user sudah punya
+  sesi aktif dari device/IP berbeda, **tanpa peduli aplikasi sumber** → user tak bisa login bersamaan
+  dari dua frontend berbeda (beda `client_id`).
+- **Solusi**: tambah kolom `source_app` di tabel `sessions` (schema `gateway_auth`), diisi dengan
+  `client_id` (`req.gwClient.clientId`) saat login berhasil. Enforcement single-session sekarang
+  **per source_app**: sesi dari source berbeda diabaikan (boleh coexist); same-device replace &
+  `ALREADY_LOGGED_IN` hanya berlaku dalam source yang sama.
+- **File**: [schema.prisma](backend_gatewayauth/prisma/schema.prisma) model `Session` (`sourceApp String? @map("source_app")`, nullable);
+  migration `20260619120000_session_source_app`;
+  [session-store.ts](backend_gatewayauth/src/shared/lib/session-store.ts) — propagasi `source_app` ke
+  DB+Redis snapshot + helper baru `destroySessionsByIds()` (revoke **selektif**, ganti
+  `destroyAllSessionsForUser` saat same-device replace agar sesi source lain tidak ikut terhapus);
+  [auth.service.ts](backend_gatewayauth/reza/modules/auth/auth.service.ts) `completeLogin` — filter
+  `sameSourceSessions`, isi `source_app` saat `createSession`; [sessions.service.ts](backend_gatewayauth/reza/modules/auth/sessions.service.ts) tampilkan `source_app` di `/auth/sessions`.
+  Path MFA otomatis ikut (lewat `completeLogin`).
+- **Kolom nullable**: row sesi lama (`source_app=NULL`) tetap valid; dibanding login baru (non-null) →
+  beda → coexist; hilang sendiri saat expire. Tidak ada backfill.
+- **Verified e2e** (4/4): login A sukses; login B (user sama, device beda) coexist sukses; login A
+  device berbeda → `ALREADY_LOGGED_IN`; login A same-device → replace sukses & sesi B tetap aktif
+  (selective revoke terbukti). DB akhir = 2 sesi aktif dengan `source_app` berbeda. tsc clean.
+
 ### 2026-06-18 Sesi 3 — Fix Live Stream WS + Log Separation + Cleanup
 - **Fix "Invalid URL" pada Live Stream**: Error `Failed to construct 'URL'` di frontend dipicu karena `VITE_API_BASE_URL` relatif (`/api/v1`). Diperbaiki di [logs-ws.ts](frontend_kartoloapps/reza/modules/administration/api/logs-ws.ts) dengan deteksi `window.location.origin`.
 - **Fix Race Condition WebSocket**: Error kanal pesan tertutup diperbaiki dengan menambahkan proteksi `manualStop` di `LogStreamSocket` agar tidak melakukan transisi status setelah komponen di-*unmount*.

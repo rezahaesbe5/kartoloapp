@@ -6,8 +6,8 @@ import { decryptPassword } from '../../../src/shared/lib/crypto-aes.js';
 import { consumeCaptcha } from '../../../src/shared/lib/captcha-store.js';
 import {
   createSession,
-  destroyAllSessionsForUser,
   destroySession,
+  destroySessionsByIds,
   getActiveSessionsForUser,
 } from '../../../src/shared/lib/session-store.js';
 import { env } from '../../../src/shared/config/env.js';
@@ -170,24 +170,29 @@ async function completeLogin(
   user: User,
   auditAction: string,
 ): Promise<SessionPayload> {
-  // Single-session enforcement dengan pengecualian device yang sama:
-  // - Tidak ada sesi aktif → login normal.
-  // - Ada sesi aktif & SEMUA berasal dari device yang sama (IP + User-Agent
+  // Single-session enforcement PER source_app (client_id), dengan pengecualian
+  // device yang sama:
+  // - Sesi aktif dari source_app BERBEDA → diabaikan (boleh hidup berdampingan,
+  //   mis. user login di portal web sekaligus aplikasi produk lain).
+  // - Tidak ada sesi aktif dari source yang sama → login normal.
+  // - Ada sesi aktif source-sama & SEMUA dari device yang sama (IP + User-Agent
   //   sama persis) → kemungkinan user logout di frontend tapi sesi backend
-  //   masih basi. Revoke sesi lama, buat sesi baru (expiry fresh). Ini menutup
-  //   kasus user tak bisa login ulang dari device yang sama.
-  // - Ada sesi aktif dari device/IP berbeda → tetap tolak ALREADY_LOGGED_IN.
+  //   masih basi. Revoke HANYA sesi source-sama itu, buat sesi baru (expiry
+  //   fresh). Sesi source lain tidak tersentuh.
+  // - Ada sesi aktif source-sama dari device/IP berbeda → tolak ALREADY_LOGGED_IN.
+  const currentSource = req.gwClient?.clientId ?? null;
   const activeSessions = await getActiveSessionsForUser(user.id);
-  if (activeSessions.length > 0) {
+  const sameSourceSessions = activeSessions.filter((s) => s.source_app === currentSource);
+  if (sameSourceSessions.length > 0) {
     const currentIp = req.ip ?? null;
     const currentUa = req.headers['user-agent'] ?? null;
-    const allSameDevice = activeSessions.every(
+    const allSameDevice = sameSourceSessions.every(
       (s) => s.ip === currentIp && s.user_agent === currentUa,
     );
 
     if (allSameDevice) {
-      // Device sama → ganti sesi basi dengan yang baru.
-      await destroyAllSessionsForUser(user.id);
+      // Device + source sama → ganti sesi basi dengan yang baru (selektif).
+      await destroySessionsByIds(sameSourceSessions.map((s) => s.id));
       writeAudit(req, {
         action: 'auth.login.session_replaced',
         userId: user.id,
@@ -214,7 +219,7 @@ async function completeLogin(
           'Akun Anda sudah login di perangkat/browser lain. ' +
           'Logout dari sana terlebih dahulu, atau hubungi administrator untuk reset sesi.',
         code: 'ALREADY_LOGGED_IN',
-        details: { active_sessions: activeSessions.length },
+        details: { active_sessions: sameSourceSessions.length },
       });
     }
   }
@@ -229,6 +234,7 @@ async function completeLogin(
     full_name: user.fullName,
     ip: req.ip ?? null,
     user_agent: req.headers['user-agent'] ?? null,
+    source_app: currentSource,
   });
 
   const accessToken = app.jwt.sign(

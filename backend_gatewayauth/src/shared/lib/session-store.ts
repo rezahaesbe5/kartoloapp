@@ -30,6 +30,7 @@ export interface SessionRecord {
   full_name: string;
   ip: string | null;
   user_agent: string | null;
+  source_app: string | null;
   created_at: string;
   expires_at: string;
 }
@@ -42,6 +43,7 @@ export interface CreateSessionInput {
   full_name: string;
   ip?: string | null;
   user_agent?: string | null;
+  source_app?: string | null;
 }
 
 export async function createSession(input: CreateSessionInput): Promise<SessionRecord> {
@@ -54,6 +56,7 @@ export async function createSession(input: CreateSessionInput): Promise<SessionR
       refreshTokenHash: REFRESH_TOKEN_PLACEHOLDER,
       ip: input.ip ?? null,
       userAgent: input.user_agent ?? null,
+      sourceApp: input.source_app ?? null,
       expiresAt,
     },
     select: { id: true, createdAt: true, expiresAt: true },
@@ -68,6 +71,7 @@ export async function createSession(input: CreateSessionInput): Promise<SessionR
     full_name: input.full_name,
     ip: input.ip ?? null,
     user_agent: input.user_agent ?? null,
+    source_app: input.source_app ?? null,
     created_at: row.createdAt.toISOString(),
     expires_at: row.expiresAt.toISOString(),
   };
@@ -169,11 +173,13 @@ export interface ActiveSessionDevice {
   id: string;
   ip: string | null;
   user_agent: string | null;
+  source_app: string | null;
 }
 
-// Daftar sesi aktif user beserta info device (ip + user_agent). Dipakai login
-// untuk menentukan apakah sesi aktif yang ada berasal dari device yang sama
-// (boleh di-replace) atau device lain (tetap ditolak ALREADY_LOGGED_IN).
+// Daftar sesi aktif user beserta info device (ip + user_agent + source_app).
+// Dipakai login untuk menentukan apakah sesi aktif yang ada berasal dari source
+// app + device yang sama (boleh di-replace) atau berbeda (sesi lintas-source
+// dibiarkan hidup; device lain di source sama → ALREADY_LOGGED_IN).
 export async function getActiveSessionsForUser(userId: string): Promise<ActiveSessionDevice[]> {
   const rows = await prisma.session.findMany({
     where: {
@@ -181,9 +187,38 @@ export async function getActiveSessionsForUser(userId: string): Promise<ActiveSe
       revokedAt: null,
       expiresAt: { gt: new Date() },
     },
-    select: { id: true, ip: true, userAgent: true },
+    select: { id: true, ip: true, userAgent: true, sourceApp: true },
   });
-  return rows.map((r) => ({ id: r.id, ip: r.ip, user_agent: r.userAgent }));
+  return rows.map((r) => ({
+    id: r.id,
+    ip: r.ip,
+    user_agent: r.userAgent,
+    source_app: r.sourceApp,
+  }));
+}
+
+// Revoke sesi tertentu (by id) milik user — dipakai saat same-device replace
+// agar HANYA sesi dari source_app yang sama yang diganti, sesi lintas-source
+// tetap hidup. Kontras dengan destroyAllSessionsForUser yang revoke semua.
+export async function destroySessionsByIds(sessionIds: string[]): Promise<number> {
+  if (sessionIds.length === 0) return 0;
+
+  const updated = await prisma.session.updateMany({
+    where: { id: { in: sessionIds }, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  // Bersihkan Redis: hapus per-session key + buang sid dari SET index user.
+  const pipeline = redis.multi();
+  for (const sid of sessionIds) {
+    const raw = await redis.get(SESSION_KEY(sid));
+    const userId = raw ? safeParseUserId(raw) : null;
+    pipeline.del(SESSION_KEY(sid));
+    if (userId) pipeline.srem(USER_SESSIONS_KEY(userId), sid);
+  }
+  await pipeline.exec();
+
+  return updated.count;
 }
 
 export async function listSessionsForUser(userId: string, limit = 20) {
@@ -195,6 +230,7 @@ export async function listSessionsForUser(userId: string, limit = 20) {
       id: true,
       ip: true,
       userAgent: true,
+      sourceApp: true,
       createdAt: true,
       expiresAt: true,
       revokedAt: true,

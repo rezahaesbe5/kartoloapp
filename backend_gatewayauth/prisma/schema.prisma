@@ -117,6 +117,7 @@ model Session {
   refreshTokenHash String    @map("refresh_token_hash")
   ip               String?
   userAgent        String?   @map("user_agent")
+  sourceApp        String?   @map("source_app")
   lastActiveAt     DateTime  @default(now()) @map("last_active_at")
   expiresAt        DateTime  @map("expires_at")
   revokedAt        DateTime? @map("revoked_at")
